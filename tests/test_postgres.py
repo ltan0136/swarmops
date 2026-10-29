@@ -38,3 +38,18 @@ async def test_state_survives_restart(postgres_url: str) -> None:
     tool_outputs = [m.content for m in result["messages"] if isinstance(m, ToolMessage)]
     assert "64" in tool_outputs and "65" in tool_outputs
     assert "65" in final_answer(result["messages"])
+
+
+async def test_delete_thread_removes_postgres_checkpoints(postgres_url: str) -> None:
+    settings = Settings(_env_file=None, llm_provider="fake", database_url=postgres_url)
+    thread_id = f"pg-del-{uuid.uuid4().hex[:8]}"
+    config = {"configurable": {"thread_id": thread_id}, "recursion_limit": 25}
+
+    async with open_checkpointer(settings) as checkpointer:
+        graph = compile_swarm(settings, checkpointer)
+        await graph.ainvoke({"messages": [{"role": "user", "content": "What is 1 + 1?"}]}, config)
+        await checkpointer.adelete_thread(thread_id)
+
+    async with open_checkpointer(settings) as checkpointer:
+        graph = compile_swarm(settings, checkpointer)
+        assert not (await graph.aget_state(config)).values

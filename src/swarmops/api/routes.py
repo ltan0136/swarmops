@@ -5,14 +5,16 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import secrets
 import uuid
 import weakref
 from collections.abc import AsyncIterator
 from typing import Annotated, Any
 
 import openai
-from fastapi import APIRouter, Depends, HTTPException, Path, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response, status
 from fastapi.responses import StreamingResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.errors import GraphRecursionError
@@ -74,6 +76,30 @@ Graph = Annotated[CompiledStateGraph, Depends(get_graph)]
 AppSettings = Annotated[Settings, Depends(get_settings_dep)]
 ThreadLock = Annotated[asyncio.Lock, Depends(get_thread_lock)]
 
+bearer = HTTPBearer(auto_error=False, description="Required when SWARMOPS_API_KEY is set.")
+
+
+def require_api_key(
+    settings: AppSettings,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+) -> None:
+    """Check the bearer token in constant time. No-op when SWARMOPS_API_KEY is not set."""
+    if settings.swarmops_api_key is None:
+        return
+    expected = settings.swarmops_api_key.get_secret_value().encode()
+    given = credentials.credentials.encode() if credentials else b""
+    if not secrets.compare_digest(given, expected):
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            "Missing or invalid API key.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+# Every route except /healthz goes on `protected`; the auth check runs before the
+# thread-lock check, so an unauthenticated caller cannot probe which threads are busy.
+protected = APIRouter(dependencies=[Depends(require_api_key)])
+
 
 def _run_config(thread_id: str, settings: Settings) -> RunnableConfig:
     return {"configurable": {"thread_id": thread_id}, "recursion_limit": settings.recursion_limit}
@@ -105,12 +131,12 @@ async def healthz(request: Request, settings: AppSettings) -> HealthResponse:
     )
 
 
-@router.post("/threads", response_model=ThreadCreated, status_code=201, tags=["threads"])
+@protected.post("/threads", response_model=ThreadCreated, status_code=201, tags=["threads"])
 async def create_thread() -> ThreadCreated:
     return ThreadCreated(thread_id=uuid.uuid4().hex)
 
 
-@router.get("/threads/{thread_id}", response_model=ThreadState, tags=["threads"])
+@protected.get("/threads/{thread_id}", response_model=ThreadState, tags=["threads"])
 async def get_thread(thread_id: ThreadId, graph: Graph) -> ThreadState:
     snapshot = await graph.aget_state({"configurable": {"thread_id": thread_id}})
     messages = snapshot.values.get("messages", []) if snapshot.values else []
@@ -123,7 +149,18 @@ async def get_thread(thread_id: ThreadId, graph: Graph) -> ThreadState:
     )
 
 
-@router.post("/threads/{thread_id}/runs", response_model=RunResponse, tags=["runs"])
+@protected.delete("/threads/{thread_id}", status_code=204, tags=["threads"])
+async def delete_thread(thread_id: ThreadId, graph: Graph, lock: ThreadLock) -> Response:
+    """Delete every checkpoint of a thread. A thread with a run in progress returns 409."""
+    async with lock:
+        snapshot = await graph.aget_state({"configurable": {"thread_id": thread_id}})
+        if not (snapshot.values or {}).get("messages"):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, f"Thread {thread_id!r} not found.")
+        await graph.checkpointer.adelete_thread(thread_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@protected.post("/threads/{thread_id}/runs", response_model=RunResponse, tags=["runs"])
 async def run_thread(
     thread_id: ThreadId, body: RunRequest, graph: Graph, settings: AppSettings, lock: ThreadLock
 ) -> RunResponse:
@@ -149,7 +186,7 @@ def _sse(event: str, data: dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
-@router.post("/threads/{thread_id}/runs/stream", tags=["runs"])
+@protected.post("/threads/{thread_id}/runs/stream", tags=["runs"])
 async def stream_thread(
     thread_id: ThreadId, body: RunRequest, graph: Graph, settings: AppSettings, lock: ThreadLock
 ) -> StreamingResponse:
@@ -188,3 +225,6 @@ async def stream_thread(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+router.include_router(protected)

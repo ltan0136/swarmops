@@ -124,8 +124,9 @@ point `SWARMOPS_TEST_DATABASE_URL` at any Postgres (for example the one from `do
 | `POST` | `/threads/{thread_id}/runs` | Run the swarm on one message; returns the answer and every step |
 | `POST` | `/threads/{thread_id}/runs/stream` | Same, streamed as SSE: `message`*, then `done` or `error` |
 | `GET` | `/threads/{thread_id}` | Full message history and the active agent |
+| `DELETE` | `/threads/{thread_id}` | Delete every checkpoint of the thread; the id can be reused |
 
-A second run on a thread that is still busy returns `409 Conflict`. A run that exceeds
+A second run (or a delete) on a thread that is still busy returns `409 Conflict`. A run that exceeds
 `RECURSION_LIMIT` steps returns `422`; an upstream LLM failure returns `502`.
 
 ## How a run works
@@ -159,8 +160,16 @@ swarmops/
 
 - `.env` is git-ignored and only `.env.example` (no real keys) is committed. Keep API keys in
   your local `.env`; CI needs no secrets because it uses the offline model.
-- v0.1 has no authentication. docker compose binds the API and Postgres to `127.0.0.1`, so do
-  not expose them on a network until auth is added.
+- Set `SWARMOPS_API_KEY` to require `Authorization: Bearer <key>` on every route except
+  `/healthz` (the container health check stays open). It is empty by default, and docker compose
+  binds the API and Postgres to `127.0.0.1`; do not expose the API on a network without a key
+  and TLS in front of it.
+
+  ```bash
+  curl -s -X POST http://localhost:8000/threads/demo/runs \
+    -H "Authorization: Bearer $SWARMOPS_API_KEY" -H 'Content-Type: application/json' \
+    -d '{"message": "What is 2 ** 8?"}'
+  ```
 - The Postgres credentials in `.env.example`, compose and CI are local placeholders. Change them
   for any shared environment.
 - The calculator parses expressions with `ast` instead of `eval`, so model-generated input cannot

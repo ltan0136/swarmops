@@ -28,7 +28,7 @@ services:
       # Always point the API at the bundled Postgres, whatever DATABASE_URL says in .env.
       DATABASE_URL: postgresql://${POSTGRES_USER:-swarmops}:${POSTGRES_PASSWORD:-swarmops}@postgres:5432/${POSTGRES_DB:-swarmops}
     ports:
-      # Localhost only: v0.1 has no authentication, so do not expose it on your network.
+      # Localhost only. Set SWARMOPS_API_KEY (and put TLS in front) before exposing it.
       - "127.0.0.1:${API_PORT:-8000}:8000"
     depends_on:
       postgres:

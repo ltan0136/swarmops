@@ -88,7 +88,8 @@ pytest -q                                # 测试使用离线模型和内存状�
 ## 安全说明
 
 - `.env` 已被 git 忽略，仓库里只有不含真实 key 的 `.env.example`。API key 只放在本地 `.env` 里；CI 使用离线模型，不需要任何密钥。
-- v0.1 还没有鉴权。docker compose 把 API 和 Postgres 都只绑定在 `127.0.0.1`，加上鉴权之前不要暴露到网络上。
+- 设置 `SWARMOPS_API_KEY` 后，除 `/healthz`（容器健康检查用）外的所有接口都要求 `Authorization: Bearer <key>`。默认不设置，docker compose 把 API 和 Postgres 都只绑定在 `127.0.0.1`；没有 key 和 TLS 时不要把 API 暴露到网络上。
+- `DELETE /threads/{thread_id}` 删除该 thread 的全部 checkpoint，之后同一 id 会作为新会话重新开始；thread 正在运行时返回 `409`。
 - `.env.example`、compose 和 CI 里的 Postgres 账号口令只是本地占位值，任何共享环境都要改掉。
 - calculator 用 `ast` 解析表达式而不是 `eval`，模型生成的输入无法执行任意代码。
 
