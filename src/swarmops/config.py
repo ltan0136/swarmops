@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     # Upper bound on graph steps per run; stops runaway agent loops.
     recursion_limit: int = Field(default=25, ge=5, le=200)
 
+    # --- API -------------------------------------------------------------------
+    # Bearer token required on every route except /healthz. Empty means no authentication,
+    # which is only safe while the API is bound to localhost (as docker compose does).
+    # Prefixed so that an unrelated API_KEY in the environment cannot switch auth on.
+    swarmops_api_key: SecretStr | None = None
+
     log_level: str = "INFO"
 
     @field_validator("database_url", "llm_base_url", mode="before")
@@ -45,7 +51,7 @@ class Settings(BaseSettings):
             return None
         return value
 
-    @field_validator("llm_api_key", mode="before")
+    @field_validator("llm_api_key", "swarmops_api_key", mode="before")
     @classmethod
     def _empty_key_to_none(cls, value: object) -> object:
         if isinstance(value, str) and not value.strip():

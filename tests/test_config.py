@@ -41,3 +41,12 @@ def test_openai_compatible_builds_real_model_and_graph() -> None:
     assert model.model_name == "qwen2.5:7b"
     # Compiling binds the tools to the model without making any network call.
     assert compile_swarm(settings, InMemorySaver()) is not None
+
+
+def test_empty_api_key_disables_auth(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("API_KEY", "unrelated")  # a generic variable must not enable auth
+    assert Settings(_env_file=None).swarmops_api_key is None
+    monkeypatch.setenv("SWARMOPS_API_KEY", "")
+    assert Settings(_env_file=None).swarmops_api_key is None
+    monkeypatch.setenv("SWARMOPS_API_KEY", "abc")
+    assert Settings(_env_file=None).swarmops_api_key.get_secret_value() == "abc"

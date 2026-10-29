@@ -82,3 +82,79 @@ async def test_stream_emits_agent_steps_then_done(client: httpx.AsyncClient) -> 
     agents = [data["agent"] for e, data in events if e == "message"]
     assert agents[0] == "planner" and "executor" in agents and agents[-1] == "reviewer"
     assert "25" in events[-1][1]["answer"]
+
+
+async def test_delete_thread_removes_its_history(client: httpx.AsyncClient) -> None:
+    await client.post("/threads/to-delete/runs", json={"message": "What is 2 + 2?"})
+    assert (await client.get("/threads/to-delete")).status_code == 200
+
+    assert (await client.delete("/threads/to-delete")).status_code == 204
+    assert (await client.get("/threads/to-delete")).status_code == 404
+    assert (await client.delete("/threads/to-delete")).status_code == 404
+
+    # The id can be reused and starts a fresh conversation with the planner.
+    response = await client.post("/threads/to-delete/runs", json={"message": "What is 3 + 3?"})
+    state = (await client.get("/threads/to-delete")).json()
+    assert response.status_code == 200
+    assert [m["content"] for m in state["messages"] if m["type"] == "human"] == ["What is 3 + 3?"]
+
+
+async def test_delete_busy_thread_returns_409(settings: Settings) -> None:
+    app = create_app(settings)
+    async with app.router.lifespan_context(app):
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as http:
+            await http.post("/threads/busy/runs", json={"message": "1 + 1"})
+            lock = app.state.thread_locks.get("busy")
+            await lock.acquire()
+            try:
+                response = await http.delete("/threads/busy")
+            finally:
+                lock.release()
+            assert response.status_code == 409
+            assert (await http.get("/threads/busy")).status_code == 200
+
+
+async def test_api_key_protects_every_route_but_healthz() -> None:
+    settings = Settings(
+        _env_file=None, llm_provider="fake", database_url=None, swarmops_api_key="s3cret-token"
+    )
+    app = create_app(settings)
+    async with app.router.lifespan_context(app):
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as http:
+            assert (await http.get("/healthz")).status_code == 200
+
+            missing = await http.post("/threads")
+            assert missing.status_code == 401
+            assert missing.headers["www-authenticate"] == "Bearer"
+            wrong = {"Authorization": "Bearer nope"}
+            assert (
+                await http.post("/threads/t1/runs", json={"message": "1"}, headers=wrong)
+            ).status_code == 401
+            assert (await http.get("/threads/t1", headers=wrong)).status_code == 401
+            assert (await http.delete("/threads/t1", headers=wrong)).status_code == 401
+
+            good = {"Authorization": "Bearer s3cret-token"}
+            assert (await http.post("/threads", headers=good)).status_code == 201
+            run = await http.post(
+                "/threads/t1/runs", json={"message": "What is 6 * 7?"}, headers=good
+            )
+            assert run.status_code == 200 and "42" in run.json()["answer"]
+
+
+async def test_auth_runs_before_busy_check() -> None:
+    settings = Settings(
+        _env_file=None, llm_provider="fake", database_url=None, swarmops_api_key="k" * 16
+    )
+    app = create_app(settings)
+    async with app.router.lifespan_context(app):
+        lock = app.state.thread_locks.get("busy")
+        await lock.acquire()
+        try:
+            transport = httpx.ASGITransport(app=app)
+            async with httpx.AsyncClient(transport=transport, base_url="http://test") as http:
+                response = await http.post("/threads/busy/runs", json={"message": "1 + 1"})
+        finally:
+            lock.release()
+    assert response.status_code == 401
