@@ -1,0 +1,16 @@
+{"id": "old-01", "input": "What is (12 + 3) * 4?", "tool_returns": [{"tool": "calculator", "args": {"expression": "(12 + 3) * 4"}, "output": "60"}], "expected": {"contains": ["60"]}}
+{"id": "old-02", "input": "What is 6 * 7?", "tool_returns": [{"tool": "calculator", "args": {"expression": "6 * 7"}, "output": "42"}], "expected": {"contains": ["42"]}}
+{"id": "old-03", "input": "Compute 2 ** 10", "tool_returns": [{"tool": "calculator", "args": {"expression": "2 ** 10"}, "output": "1024"}], "expected": {"contains": ["1024"]}}
+{"id": "old-04", "input": "What is 100 / 8?", "tool_returns": [{"tool": "calculator", "args": {"expression": "100 / 8"}, "output": "12.5"}], "expected": {"contains": ["12.5"]}}
+{"id": "old-05", "input": "How much is 123 + 456?", "tool_returns": [{"tool": "calculator", "args": {"expression": "123 + 456"}, "output": "579"}], "expected": {"contains": ["579"]}}
+{"id": "old-06", "input": "What is 7 * 8 + 6?", "tool_returns": [{"tool": "calculator", "args": {"expression": "7 * 8 + 6"}, "output": "62"}], "expected": {"contains": ["62"]}}
+{"id": "old-07", "input": "What is 999 - 333?", "tool_returns": [{"tool": "calculator", "args": {"expression": "999 - 333"}, "output": "666"}], "expected": {"contains": ["666"]}}
+{"id": "old-08", "input": "Calculate (250 - 50) * 3", "tool_returns": [{"tool": "calculator", "args": {"expression": "(250 - 50) * 3"}, "output": "600"}], "expected": {"contains": ["600"]}}
+{"id": "old-09", "input": "What is 81 / 9 + 11?", "tool_returns": [{"tool": "calculator", "args": {"expression": "81 / 9 + 11"}, "output": "20"}], "expected": {"contains": ["20"]}}
+{"id": "old-10", "input": "What is 13 * 13?", "tool_returns": [{"tool": "calculator", "args": {"expression": "13 * 13"}, "output": "169"}], "expected": {"contains": ["169"]}}
+{"id": "old-11", "input": "2.5 * 4 + 1.5 = ?", "tool_returns": [{"tool": "calculator", "args": {"expression": "2.5 * 4 + 1.5"}, "output": "11.5"}], "expected": {"contains": ["11.5"]}}
+{"id": "old-12", "input": "What is 1000 // 7?", "tool_returns": [{"tool": "calculator", "args": {"expression": "1000 // 7"}, "output": "142"}], "expected": {"contains": ["142"]}}
+{"id": "old-13", "input": "What is (3 + 4) * (5 + 6)?", "tool_returns": [{"tool": "calculator", "args": {"expression": "(3 + 4) * (5 + 6)"}, "output": "77"}], "expected": {"contains": ["77"]}}
+{"id": "old-14", "input": "What time is it now?", "tool_returns": [{"tool": "get_current_time", "args": {"timezone": "UTC"}, "output": "2026-10-28T09:15:02+00:00"}], "expected": {"contains": ["2026-10-28T09:15:02"]}}
+{"id": "old-15", "input": "What is today's date in UTC?", "tool_returns": [{"tool": "get_current_time", "args": {"timezone": "UTC"}, "output": "2026-10-28T13:40:51+00:00"}], "expected": {"contains": ["2026-10-28"]}}
+{"id": "old-16", "input": "Tell me the current UTC time.", "tool_returns": [{"tool": "get_current_time", "args": {"timezone": "UTC"}, "output": "2026-10-29T01:05:33+00:00"}], "expected": {"contains": ["2026-10-29T01:05:33"]}}

@@ -1,0 +1,3 @@
+{"id": "sample-01", "input": "What is (12 + 3) * 4?", "expected": {"contains": ["60"]}}
+{"id": "sample-02", "input": "What is 2 ** 10?", "expected": {"contains": ["1024"]}}
+{"id": "sample-03", "input": "What time is it now?", "note": "expected left empty on purpose: a time answer needs an expert-written rule"}

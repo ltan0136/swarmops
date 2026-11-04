@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
+
 from langchain.agents import create_agent
+from langchain_core.language_models import BaseChatModel
+from langchain_core.tools import BaseTool
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import StateGraph
 from langgraph.graph.state import CompiledStateGraph
@@ -10,36 +14,48 @@ from langgraph_swarm import create_handoff_tool, create_swarm
 
 from swarmops.config import Settings
 from swarmops.llm import get_chat_model
-from swarmops.roles import EXECUTOR, PLANNER, REVIEWER
-from swarmops.swarm.prompts import EXECUTOR_PROMPT, PLANNER_PROMPT, REVIEWER_PROMPT
+from swarmops.roles import EXECUTOR, PLANNER, REVIEWER, AgentName
+from swarmops.swarm.prompts import DEFAULT_PROMPTS, PromptSet
 from swarmops.swarm.tools import WORK_TOOLS
 
+ModelFactory = Callable[[AgentName, Settings], BaseChatModel]
 
-def build_swarm(settings: Settings) -> StateGraph:
-    """Return the uncompiled swarm graph. Each agent can only hand off along allowed edges."""
+
+def build_swarm(
+    settings: Settings,
+    *,
+    prompts: PromptSet = DEFAULT_PROMPTS,
+    work_tools: Sequence[BaseTool] = WORK_TOOLS,
+    model_factory: ModelFactory = get_chat_model,
+) -> StateGraph:
+    """Return the uncompiled swarm graph. Each agent can only hand off along allowed edges.
+
+    The keyword arguments are seams for experiments (see docs/adr/0004): evals swap in a
+    prompt variant, replayed tools or a test model. Production code uses the defaults.
+    """
     planner = create_agent(
-        get_chat_model(PLANNER, settings),
+        model_factory(PLANNER, settings),
         tools=[
             create_handoff_tool(
                 agent_name=EXECUTOR, description="Hand the plan to the executor to carry out."
             ),
         ],
-        system_prompt=PLANNER_PROMPT,
+        system_prompt=prompts.planner,
         name=PLANNER,
     )
     executor = create_agent(
-        get_chat_model(EXECUTOR, settings),
+        model_factory(EXECUTOR, settings),
         tools=[
-            *WORK_TOOLS,
+            *work_tools,
             create_handoff_tool(
                 agent_name=REVIEWER, description="Send the finished results to the reviewer."
             ),
         ],
-        system_prompt=EXECUTOR_PROMPT,
+        system_prompt=prompts.executor,
         name=EXECUTOR,
     )
     reviewer = create_agent(
-        get_chat_model(REVIEWER, settings),
+        model_factory(REVIEWER, settings),
         tools=[
             create_handoff_tool(
                 agent_name=PLANNER, description="Ask the planner to plan a new user request."
@@ -48,7 +64,7 @@ def build_swarm(settings: Settings) -> StateGraph:
                 agent_name=EXECUTOR, description="Send the work back to the executor to fix."
             ),
         ],
-        system_prompt=REVIEWER_PROMPT,
+        system_prompt=prompts.reviewer,
         name=REVIEWER,
     )
     return create_swarm([planner, executor, reviewer], default_active_agent=PLANNER)
