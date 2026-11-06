@@ -173,7 +173,9 @@ swarmops/
 - The Postgres credentials in `.env.example`, compose and CI are local placeholders. Change them
   for any shared environment.
 - The calculator parses expressions with `ast` instead of `eval`, so model-generated input cannot
-  execute code.
+  execute code. It also caps every integer result at 4096 bits (checked before a power is
+  computed), so a short input such as `(((9**99)**99)**99)**99` is rejected instead of pinning
+  the CPU and freezing the API.
 
 ## Design decisions
 

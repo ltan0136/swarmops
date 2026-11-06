@@ -91,7 +91,8 @@ pytest -q                                # 测试使用离线模型和内存状�
 - 设置 `SWARMOPS_API_KEY` 后，除 `/healthz`（容器健康检查用）外的所有接口都要求 `Authorization: Bearer <key>`。默认不设置，docker compose 把 API 和 Postgres 都只绑定在 `127.0.0.1`；没有 key 和 TLS 时不要把 API 暴露到网络上。
 - `DELETE /threads/{thread_id}` 删除该 thread 的全部 checkpoint，之后同一 id 会作为新会话重新开始；thread 正在运行时返回 `409`。
 - `.env.example`、compose 和 CI 里的 Postgres 账号口令只是本地占位值，任何共享环境都要改掉。
-- calculator 用 `ast` 解析表达式而不是 `eval`，模型生成的输入无法执行任意代码。
+- calculator 用 `ast` 解析表达式而不是 `eval`，模型生成的输入无法执行任意代码。每个整数结果限制在 4096 位以内（乘方在计算前检查），
+  因此 `(((9**99)**99)**99)**99` 这类短输入会被拒绝，而不会占满 CPU、让整个 API 停止响应。
 
 ## 设计决策
 
