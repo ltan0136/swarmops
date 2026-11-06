@@ -44,6 +44,17 @@ async def test_run_returns_answer_and_steps(client: httpx.AsyncClient) -> None:
     assert [s["name"] for s in body["steps"] if s["type"] == "ai"][0] == "planner"
 
 
+async def test_oversized_arithmetic_is_rejected_without_blocking(client: httpx.AsyncClient) -> None:
+    # Regression: this 24-character request used to pin the CPU and freeze /healthz.
+    response = await client.post(
+        "/threads/big/runs", json={"message": "What is (((9**99)**99)**99)**99?"}
+    )
+    assert response.status_code == 200
+    steps = response.json()["steps"]
+    calculator_outputs = [s["content"] for s in steps if s["name"] == "calculator"]
+    assert calculator_outputs == ["Error: result too large"]
+
+
 async def test_thread_state_persists_across_requests(client: httpx.AsyncClient) -> None:
     await client.post("/threads/demo-1/runs", json={"message": "What is 3 + 4?"})
     await client.post("/threads/demo-1/runs", json={"message": "And 10 - 1?"})

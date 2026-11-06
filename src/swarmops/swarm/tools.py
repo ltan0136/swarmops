@@ -12,6 +12,10 @@ from langchain_core.tools import BaseTool, tool
 
 MAX_EXPRESSION_LENGTH = 200
 MAX_EXPONENT = 100
+# Integers are arbitrary precision, so a short expression such as
+# "(((9**99)**99)**99)**99" would otherwise build a number with ~10^8 digits and
+# hold the GIL (freezing the whole API process) for minutes.
+MAX_RESULT_BITS = 4096
 
 _BINARY_OPERATORS: dict[type[ast.operator], Callable[[float, float], float]] = {
     ast.Add: operator.add,
@@ -50,9 +54,23 @@ def _eval_node(node: ast.expr) -> int | float:
         return node.value
     if isinstance(node, ast.BinOp) and type(node.op) in _BINARY_OPERATORS:
         left, right = _eval_node(node.left), _eval_node(node.right)
-        if isinstance(node.op, ast.Pow) and abs(right) > MAX_EXPONENT:
-            raise ValueError(f"exponent larger than {MAX_EXPONENT}")
-        return _BINARY_OPERATORS[type(node.op)](left, right)
+        if isinstance(node.op, ast.Pow):
+            if abs(right) > MAX_EXPONENT:
+                raise ValueError(f"exponent larger than {MAX_EXPONENT}")
+            # Check the size before computing: |left| ** |right| has at most
+            # bit_length(left) * |right| bits.
+            if (
+                isinstance(left, int)
+                and isinstance(right, int)
+                and abs(left).bit_length() * abs(right) > MAX_RESULT_BITS
+            ):
+                raise ValueError("result too large")
+        result = _BINARY_OPERATORS[type(node.op)](left, right)
+        # Operands are already bounded, so +, -, * and // stay cheap; this keeps every
+        # intermediate integer bounded as well.
+        if isinstance(result, int) and result.bit_length() > MAX_RESULT_BITS:
+            raise ValueError("result too large")
+        return result
     if isinstance(node, ast.UnaryOp) and type(node.op) in _UNARY_OPERATORS:
         return _UNARY_OPERATORS[type(node.op)](_eval_node(node.operand))
     raise ValueError(f"unsupported syntax: {type(node).__name__}")
