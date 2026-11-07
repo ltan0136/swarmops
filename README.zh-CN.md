@@ -85,6 +85,19 @@ pytest -q                                # 测试使用离线模型和内存状�
 4. **reviewer** 给出最终答案，或者把工作退回 executor 重做。
 5. 每一步都以 thread id 为键写入 Postgres。此时 reviewer 是活跃 agent，所以下一条消息先到它手里，它会把新请求交回 planner。
 
+## 评测：是 prompt 的问题，还是环境变了？
+
+改了 prompt 之后线上变差时，`python -m swarmops.evals replay` 会跑一个 2×2 网格：{旧, 新} prompt × {旧, 新} 录制流量。工具返回值从录制里重放，所以每组对比只改变一个因素。
+
+```bash
+make eval-replay      # 用 evals/data 里的样例数据，报告写到 evals/reports/replay_2x2.md
+
+# 录制自己的流量（调用真实工具），再给每条 episode 补上 expected
+python -m swarmops.evals record evals/inputs/sample.jsonl --out evals/data/my_week.jsonl
+```
+
+默认的离线模型不读 prompt，所以 prompt 这一轴必然是平的，相当于一次 A/A 自检；要测真实的 prompt 效果，把 `LLM_PROVIDER` 换成真实模型。设计和失效场景见 [ADR 0004](docs/adr/0004-replay-2x2-eval.md)。
+
 ## 安全说明
 
 - `.env` 已被 git 忽略，仓库里只有不含真实 key 的 `.env.example`。API key 只放在本地 `.env` 里；CI 使用离线模型，不需要任何密钥。
@@ -99,6 +112,7 @@ pytest -q                                # 测试使用离线模型和内存状�
 - [ADR 0001：限制交接边的蜂群](docs/adr/0001-swarm-with-restricted-handoffs.md)
 - [ADR 0002：用 Postgres 做 checkpointer](docs/adr/0002-postgres-checkpointer.md)
 - [ADR 0003：用于演示、测试和 CI 的离线脚本模型](docs/adr/0003-scripted-offline-model.md)
+- [ADR 0004：基于重放的 2×2 评测](docs/adr/0004-replay-2x2-eval.md)
 
 ## 路线图
 

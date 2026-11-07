@@ -138,6 +138,23 @@ A second run (or a delete) on a thread that is still busy returns `409 Conflict`
 5. Every step is checkpointed to Postgres under the thread id. The reviewer is now active, so the
    next message goes to it first, and it hands new requests back to the planner.
 
+## Evals: is it the prompt or the environment?
+
+When quality drops after a prompt change, `python -m swarmops.evals replay` runs a 2x2 grid:
+{old, new} prompts x {old, new} recorded traffic. Tool outputs are replayed from the recording,
+so each comparison changes exactly one thing.
+
+```bash
+make eval-replay      # fixtures in evals/data, report in evals/reports/replay_2x2.md
+
+# record your own traffic (live tools), then add an "expected" to each episode
+python -m swarmops.evals record evals/inputs/sample.jsonl --out evals/data/my_week.jsonl
+```
+
+With the default offline model the prompt axis is flat by construction (it ignores prompts), so
+the run doubles as an A/A check; point `LLM_PROVIDER` at a real model to measure prompt effects.
+Design and failure modes: [ADR 0004](docs/adr/0004-replay-2x2-eval.md).
+
 ## Project layout
 
 ```
@@ -146,10 +163,12 @@ swarmops/
 │   ├── api/            # FastAPI app factory, routes, request/response schemas
 │   ├── swarm/          # agent graph, prompts and tools
 │   ├── llm/            # model factory + offline scripted model
+│   ├── evals/          # record / replay 2x2 eval (`python -m swarmops.evals`)
 │   ├── checkpoint.py   # Postgres or in-memory checkpointer
 │   ├── config.py       # settings from env / .env
 │   └── cli.py          # `swarmops "..."` one-shot runner
 ├── tests/              # unit, API, SSE and Postgres integration tests
+├── evals/              # recorded traffic, prompt variants, reports (git-ignored)
 ├── docs/adr/           # architecture decision records
 ├── Dockerfile          # multi-stage, non-root, health check
 ├── docker-compose.yml  # API + Postgres (+ optional Ollama)
@@ -182,6 +201,7 @@ swarmops/
 - [ADR 0001: a swarm with restricted handoff edges](docs/adr/0001-swarm-with-restricted-handoffs.md)
 - [ADR 0002: Postgres as the checkpointer](docs/adr/0002-postgres-checkpointer.md)
 - [ADR 0003: a scripted offline model for demos, tests and CI](docs/adr/0003-scripted-offline-model.md)
+- [ADR 0004: a replay-based 2x2 eval](docs/adr/0004-replay-2x2-eval.md)
 
 ## Roadmap
 
