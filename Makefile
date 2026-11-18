@@ -1,4 +1,4 @@
-.PHONY: install test lint format dev up down logs
+.PHONY: install test lint format dev up down reset logs
 
 install:  ## Install the package with dev tools into the active virtualenv
 	pip install -e ".[dev]"
@@ -20,7 +20,10 @@ dev:  ## Run the API locally with auto-reload
 up:  ## Build and start API + Postgres in Docker
 	docker compose up -d --build --wait
 
-down:  ## Stop the stack and delete its volumes
+down:  ## Stop the stack and preserve its data volumes
+	docker compose down
+
+reset:  ## Remove the stack and delete all Compose-managed volumes
 	docker compose down -v
 
 logs:  ## Follow API logs

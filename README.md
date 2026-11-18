@@ -77,7 +77,7 @@ docker compose restart api && docker compose up -d --wait
 curl -s http://localhost:8000/threads/demo
 ```
 
-Interactive API docs: <http://localhost:8000/docs>. Stop everything with `docker compose down -v`.
+Interactive API docs: <http://localhost:8000/docs>. Use `make down` to stop the stack and keep database threads for the next start. Use `make reset` only when you intend to delete the local Compose volumes, including database and downloaded Ollama data.
 
 ## Use a real model
 

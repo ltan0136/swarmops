@@ -42,7 +42,7 @@ docker compose restart api && docker compose up -d --wait
 curl -s http://localhost:8000/threads/demo
 ```
 
-交互式接口文档：<http://localhost:8000/docs>。用 `docker compose down -v` 停止并清理。
+交互式接口文档：<http://localhost:8000/docs>。使用 `make down` 停止服务，会话保留到下次启动。需要删除本地 Compose 数据卷（包括数据库和已下载的 Ollama 数据）时，使用 `make reset`。
 
 ## 切换到真实模型
 

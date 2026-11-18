@@ -67,6 +67,11 @@ jobs:
           docker compose restart api
           docker compose up -d --wait --wait-timeout 120
           curl -fsS http://localhost:8000/threads/ci | grep -q '"active_agent":"reviewer"'
+      - name: Stop and recreate the stack and check the thread survived
+        run: |
+          make down
+          docker compose up -d --wait --wait-timeout 120
+          curl -fsS http://localhost:8000/threads/ci | grep -q '"active_agent":"reviewer"'
       - name: Show logs on failure
         if: failure()
         run: docker compose logs
